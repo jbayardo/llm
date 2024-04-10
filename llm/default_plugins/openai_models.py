@@ -309,6 +309,11 @@ class Chat(Model):
             )
             chunks = []
             for chunk in completion:
+                # When using Azure OpenAI after some API version from 2023, the first chunk is information about
+                # whether the response is filtered, so we skip it.
+                # See: https://github.com/Azure/azure-rest-api-specs/pull/25880
+                if len(chunk.choices) == 0:
+                    continue
                 chunks.append(chunk)
                 content = chunk.choices[0].delta.content
                 if content is not None:
