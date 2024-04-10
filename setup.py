@@ -48,6 +48,7 @@ setup(
         "setuptools",
         "pip",
         "pyreadline3; sys_platform == 'win32'",
+        "azure-identity",
     ],
     extras_require={
         "test": [

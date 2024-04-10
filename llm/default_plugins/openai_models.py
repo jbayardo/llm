@@ -326,29 +326,48 @@ class Chat(Model):
 
     def get_client(self):
         kwargs = {}
-        if self.api_base:
-            kwargs["base_url"] = self.api_base
-        if self.api_type:
-            kwargs["api_type"] = self.api_type
-        if self.api_version:
-            kwargs["api_version"] = self.api_version
-        if self.api_engine:
-            kwargs["engine"] = self.api_engine
-        if self.needs_key:
-            if self.key:
-                kwargs["api_key"] = self.key
-        else:
-            # OpenAI-compatible models don't need a key, but the
-            # openai client library requires one
-            kwargs["api_key"] = "DUMMY_KEY"
-        if self.headers:
-            kwargs["default_headers"] = self.headers
-        if os.environ.get("LLM_OPENAI_SHOW_RESPONSES"):
-            kwargs["http_client"] = logging_client()
         if self.api_type == 'azure':
             key_env_var = "AZURE_OPENAI_API_KEY"
-            return openai.AzureOpenAI(api_version=self.api_version, azure_endpoint=self.api_base)
-        return openai.OpenAI(**kwargs)
+
+            kwargs["api_version"] = self.api_version
+            kwargs["azure_endpoint"] = self.api_base
+
+            if self.needs_key:
+                if self.key:
+                    kwargs["api_key"] = self.key
+                else:
+                    kwargs["api_key"] = os.environ.get(key_env_var)
+                    if not kwargs["api_key"]:
+                        raise ValueError(
+                            f"OpenAI API key not found. Please set {key_env_var} environment variable."
+                        )
+            else:
+                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+                kwargs['azure_ad_token_provider'] = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+
+            return openai.AzureOpenAI(**kwargs)
+        else:
+            if self.api_base:
+                kwargs["base_url"] = self.api_base
+            if self.api_type:
+                kwargs["api_type"] = self.api_type
+            if self.api_version:
+                kwargs["api_version"] = self.api_version
+            if self.api_engine:
+                kwargs["engine"] = self.api_engine
+            if self.needs_key:
+                if self.key:
+                    kwargs["api_key"] = self.key
+            else:
+                # OpenAI-compatible models don't need a key, but the
+                # openai client library requires one
+                kwargs["api_key"] = "DUMMY_KEY"
+            if self.headers:
+                kwargs["default_headers"] = self.headers
+            if os.environ.get("LLM_OPENAI_SHOW_RESPONSES"):
+                kwargs["http_client"] = logging_client()
+
+            return openai.OpenAI(**kwargs)
 
     def build_kwargs(self, prompt):
         kwargs = dict(not_nulls(prompt.options))

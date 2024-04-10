@@ -38,6 +38,7 @@ import textwrap
 from typing import cast, Optional, Iterable, Union, Tuple
 import warnings
 import yaml
+import traceback
 
 warnings.simplefilter("ignore", ResourceWarning)
 
@@ -46,6 +47,11 @@ DEFAULT_EMBEDDING_MODEL = "ada-002"
 
 DEFAULT_TEMPLATE = "prompt: "
 
+
+def fmt_exception(ex):
+    stack_trace = traceback.format_exception(type(ex), ex, ex.__traceback__)
+    full_error_message = f"{ex}\n{''.join(stack_trace)}"
+    return full_error_message
 
 def _validate_metadata_json(ctx, param, value):
     if value is None:
@@ -215,7 +221,7 @@ def prompt(
         try:
             prompt, system = template_obj.evaluate(prompt, params)
         except Template.MissingVariables as ex:
-            raise click.ClickException(str(ex))
+            raise click.ClickException(fmt_exception(ex))
         if model_id is None and template_obj.model:
             model_id = template_obj.model
 
@@ -225,7 +231,7 @@ def prompt(
         try:
             conversation = load_conversation(conversation_id)
         except UnknownModelError as ex:
-            raise click.ClickException(str(ex))
+            raise click.ClickException(fmt_exception(ex))
 
     # Figure out which model we are using
     if model_id is None:
@@ -281,7 +287,7 @@ def prompt(
         else:
             print(response.text())
     except Exception as ex:
-        raise click.ClickException(str(ex))
+        raise click.ClickException(fmt_exception(ex))
 
     # Log to the database
     if (logs_on() or log) and not no_log:
@@ -355,7 +361,7 @@ def chat(
         try:
             conversation = load_conversation(conversation_id)
         except UnknownModelError as ex:
-            raise click.ClickException(str(ex))
+            raise click.ClickException(fmt_exception(ex))
 
     template_obj = None
     if template:
@@ -433,7 +439,7 @@ def chat(
             try:
                 prompt, system = template_obj.evaluate(prompt, params)
             except Template.MissingVariables as ex:
-                raise click.ClickException(str(ex))
+                raise click.ClickException(fmt_exception(ex))
         if prompt.strip() in ("exit", "quit"):
             break
         response = conversation.prompt(prompt, system, **validated_options)
@@ -1339,7 +1345,7 @@ def embed_multi(
                 else io.BufferedReader(sys.stdin.buffer)
             )
         except json.JSONDecodeError as ex:
-            raise click.ClickException(str(ex))
+            raise click.ClickException(fmt_exception(ex))
 
     with click.progressbar(
         rows, label="Embedding", show_percent=True, length=expected_length
@@ -1609,7 +1615,7 @@ def load_template(name):
     try:
         loaded = yaml.safe_load(path.read_text())
     except yaml.YAMLError as ex:
-        raise click.ClickException("Invalid YAML: {}".format(str(ex)))
+        raise click.ClickException("Invalid YAML: {}".format(fmt_exception(ex)))
     if isinstance(loaded, str):
         return Template(name=name, prompt=loaded)
     loaded["name"] = name
