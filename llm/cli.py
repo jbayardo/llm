@@ -348,8 +348,8 @@ def chat(
     Hold an ongoing chat with a model.
     """
     # Left and right arrow keys to move cursor:
-    readline.parse_and_bind("\\e[D: backward-char")
-    readline.parse_and_bind("\\e[C: forward-char")
+    readline.parse_and_bind("Left: backward-char")
+    readline.parse_and_bind("Right: forward-char")
     log_path = logs_db_path()
     (log_path.parent).mkdir(parents=True, exist_ok=True)
     db = sqlite_utils.Database(log_path)
