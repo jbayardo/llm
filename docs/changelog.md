@@ -1,5 +1,40 @@
 # Changelog
 
+(v0_16)=
+## 0.16 (2024-09-12)
+
+- OpenAI models now use the internal `self.get_key()` mechanism, which means they can be used from Python code in a way that will pick up keys that have been configured using `llm keys set` or the `OPENAI_API_KEY` environment variable. [#552](https://github.com/simonw/llm/issues/552). This code now works correctly:
+    ```python
+    import llm
+    print(llm.get_model("gpt-4o-mini").prompt("hi"))
+    ```
+- New documented API methods: `llm.get_default_model()`, `llm.set_default_model(alias)`, `llm.get_default_embedding_model(alias)`, `llm.set_default_embedding_model()`. [#553](https://github.com/simonw/llm/issues/553)
+- Support for OpenAI's new [o1 family](https://openai.com/o1/) of preview models, `llm -m o1-preview "prompt"` and `llm -m o1-mini "prompt"`. These models are currently only available to [tier 5](https://platform.openai.com/docs/guides/rate-limits/usage-tiers?context=tier-five) OpenAI API users, though this may change in the future. [#570](https://github.com/simonw/llm/issues/570)
+
+(v0_15)=
+## 0.15 (2024-07-18)
+
+- Support for OpenAI's [new GPT-4o mini](https://openai.com/index/gpt-4o-mini-advancing-cost-efficient-intelligence/) model: `llm -m gpt-4o-mini 'rave about pelicans in French'` [#536](https://github.com/simonw/llm/issues/536)
+- `gpt-4o-mini` is now the default model if you do not {ref}`specify your own default <setup-default-model>`, replacing GPT-3.5 Turbo. GPT-4o mini is both cheaper and better than GPT-3.5 Turbo.
+- Fixed a bug where `llm logs -q 'flourish' -m haiku` could not combine both the `-q` search query and the `-m` model specifier. [#515](https://github.com/simonw/llm/issues/515)
+
+(v0_14)=
+## 0.14 (2024-05-13)
+
+- Support for OpenAI's [new GPT-4o](https://openai.com/index/hello-gpt-4o/) model: `llm -m gpt-4o 'say hi in Spanish'` [#490](https://github.com/simonw/llm/issues/490)
+- The `gpt-4-turbo` alias is now a model ID, which indicates the latest version of OpenAI's GPT-4 Turbo text and image model. Your existing `logs.db` database may contain records under the previous model ID of `gpt-4-turbo-preview`. [#493](https://github.com/simonw/llm/issues/493)
+- New `llm logs -r/--response` option for outputting just the last captured response, without wrapping it in Markdown and accompanying it with the prompt. [#431](https://github.com/simonw/llm/issues/431)
+- Nine new {ref}`plugins <plugin-directory>` since version 0.13:
+  - **[llm-claude-3](https://github.com/simonw/llm-claude-3)** supporting Anthropic's [Claude 3 family](https://www.anthropic.com/news/claude-3-family) of models.
+  - **[llm-command-r](https://github.com/simonw/llm-command-r)** supporting Cohere's Command R and [Command R Plus](https://txt.cohere.com/command-r-plus-microsoft-azure/) API models.
+  - **[llm-reka](https://github.com/simonw/llm-reka)** supports the [Reka](https://www.reka.ai/) family of models via their API.
+  - **[llm-perplexity](https://github.com/hex/llm-perplexity)** by Alexandru Geana supporting the [Perplexity Labs](https://docs.perplexity.ai/) API models, including `llama-3-sonar-large-32k-online` which can search for things online and `llama-3-70b-instruct`.
+  - **[llm-groq](https://github.com/angerman/llm-groq)** by Moritz Angermann providing access to fast models hosted by [Groq](https://console.groq.com/docs/models).
+  - **[llm-fireworks](https://github.com/simonw/llm-fireworks)** supporting models hosted by [Fireworks AI](https://fireworks.ai/).
+  - **[llm-together](https://github.com/wearedevx/llm-together)** adds support for the [Together AI](https://www.together.ai/) extensive family of hosted openly licensed models.
+  - **[llm-embed-onnx](https://github.com/simonw/llm-embed-onnx)** provides seven embedding models that can be executed using the ONNX model framework.
+  - **[llm-cmd](https://github.com/simonw/llm-cmd)** accepts a prompt for a shell command, runs that prompt and populates the result in your shell so you can review it, edit it and then hit `<enter>` to execute or `ctrl+c` to cancel, see [this post for details](https://simonwillison.net/2024/Mar/26/llm-cmd/).
+
 (v0_13_1)=
 ## 0.13.1 (2024-01-26)
 
@@ -153,7 +188,7 @@ To create embeddings for every JPEG in a directory stored in a `photos` collecti
 llm install llm-clip
 llm embed-multi photos --files photos/ '*.jpg' --binary -m clip
 ```
-Now you can search for photos of racoons using:
+Now you can search for photos of raccoons using:
 ```
 llm similar photos -c 'raccoon'
 ```

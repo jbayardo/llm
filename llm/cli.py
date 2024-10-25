@@ -10,6 +10,8 @@ from llm import (
     Template,
     UnknownModelError,
     encode,
+    get_default_model,
+    get_default_embedding_model,
     get_embedding_models_with_aliases,
     get_embedding_model_aliases,
     get_embedding_model,
@@ -20,6 +22,8 @@ from llm import (
     get_models_with_aliases,
     user_dir,
     set_alias,
+    set_default_model,
+    set_default_embedding_model,
     remove_alias,
 )
 
@@ -41,9 +45,6 @@ import yaml
 import traceback
 
 warnings.simplefilter("ignore", ResourceWarning)
-
-DEFAULT_MODEL = "gpt-3.5-turbo"
-DEFAULT_EMBEDDING_MODEL = "ada-002"
 
 DEFAULT_TEMPLATE = "prompt: "
 
@@ -722,7 +723,8 @@ def logs_list(
     if conversation_id:
         where_bits.append("responses.conversation_id = :conversation_id")
     if where_bits:
-        sql_format["extra_where"] = " where " + " and ".join(where_bits)
+        where_ = " and " if query else " where "
+        sql_format["extra_where"] = where_ + " and ".join(where_bits)
 
     final_sql = sql.format(**sql_format)
     rows = list(
@@ -1578,30 +1580,6 @@ def _truncate_string(s, max_length=100):
     if len(s) > max_length:
         return s[: max_length - 3] + "..."
     return s
-
-
-def get_default_model(filename="default_model.txt", default=DEFAULT_MODEL):
-    path = user_dir() / filename
-    if path.exists():
-        return path.read_text().strip()
-    else:
-        return default
-
-
-def set_default_model(model, filename="default_model.txt"):
-    path = user_dir() / filename
-    if model is None and path.exists():
-        path.unlink()
-    else:
-        path.write_text(model)
-
-
-def get_default_embedding_model():
-    return get_default_model("default_embedding_model.txt", None)
-
-
-def set_default_embedding_model(model):
-    set_default_model(model, "default_embedding_model.txt")
 
 
 def logs_db_path():

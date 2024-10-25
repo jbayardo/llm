@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import os
 
-VERSION = "0.13.1"
+VERSION = "0.16"
 
 
 def get_long_description():
@@ -39,7 +39,7 @@ setup(
         "click",
         "openai>=1.0",
         "click-default-group>=1.2.3",
-        "sqlite-utils>=3.35.0",
+        "sqlite-utils>=3.37",
         "sqlite-migrate>=0.1a2",
         "pydantic>=1.10.2",
         "PyYAML",
@@ -56,7 +56,7 @@ setup(
             "numpy",
             "pytest-httpx",
             "cogapp",
-            "mypy",
+            "mypy>=1.10.0",
             "black>=24.1.0",
             "ruff",
             "types-click",

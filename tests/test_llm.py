@@ -5,6 +5,7 @@ from llm.cli import cli
 from llm.migrations import migrate
 import json
 import os
+import pathlib
 import pytest
 import re
 import sqlite_utils
@@ -146,16 +147,19 @@ def test_logs_filtered(user_path, model):
 
 
 @pytest.mark.parametrize(
-    "query,expected",
+    "query,extra_args,expected",
     (
         # With no search term order should be by datetime
-        ("", ["doc1", "doc2", "doc3"]),
+        ("", [], ["doc1", "doc2", "doc3"]),
         # With a search it's order by rank instead
-        ("llama", ["doc1", "doc3"]),
-        ("alpaca", ["doc2"]),
+        ("llama", [], ["doc1", "doc3"]),
+        ("alpaca", [], ["doc2"]),
+        # Model filter should work too
+        ("llama", ["-m", "davinci"], ["doc1", "doc3"]),
+        ("llama", ["-m", "davinci2"], []),
     ),
 )
-def test_logs_search(user_path, query, expected):
+def test_logs_search(user_path, query, extra_args, expected):
     log_path = str(user_path / "logs.db")
     db = sqlite_utils.Database(log_path)
     migrate(db)
@@ -175,7 +179,7 @@ def test_logs_search(user_path, query, expected):
     _insert("doc2", "alpaca")
     _insert("doc3", "llama llama")
     runner = CliRunner()
-    result = runner.invoke(cli, ["logs", "list", "-q", query, "--json"])
+    result = runner.invoke(cli, ["logs", "list", "-q", query, "--json"] + extra_args)
     assert result.exit_code == 0
     records = json.loads(result.output.strip())
     assert [record["id"] for record in records] == expected
@@ -257,7 +261,7 @@ def test_llm_default_prompt(
 
     assert len(rows) == 1
     expected = {
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-4o-mini",
         "prompt": "three names \nfor a pet pelican",
         "system": None,
         "options_json": "{}",
@@ -271,7 +275,7 @@ def test_llm_default_prompt(
         "messages": [{"role": "user", "content": "three names \nfor a pet pelican"}]
     }
     assert json.loads(row["response_json"]) == {
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-4o-mini",
         "choices": [{"message": {"content": "Bob, Alice, Eve"}}],
     }
 
@@ -285,7 +289,7 @@ def test_llm_default_prompt(
     assert (
         log_json[0].items()
         >= {
-            "model": "gpt-3.5-turbo",
+            "model": "gpt-4o-mini",
             "prompt": "three names \nfor a pet pelican",
             "system": None,
             "prompt_json": {
@@ -296,12 +300,12 @@ def test_llm_default_prompt(
             "options_json": {},
             "response": "Bob, Alice, Eve",
             "response_json": {
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-4o-mini",
                 "choices": [{"message": {"content": "Bob, Alice, Eve"}}],
             },
             # This doesn't have the \n after three names:
             "conversation_name": "three names for a pet pelican",
-            "conversation_model": "gpt-3.5-turbo",
+            "conversation_model": "gpt-4o-mini",
         }.items()
     )
 
@@ -553,3 +557,16 @@ def test_llm_user_dir(tmpdir, monkeypatch):
     user_dir2 = llm.user_dir()
     assert user_dir == str(user_dir2)
     assert os.path.exists(user_dir)
+
+
+def test_model_defaults(tmpdir, monkeypatch):
+    user_dir = str(tmpdir / "u")
+    monkeypatch.setenv("LLM_USER_PATH", user_dir)
+    config_path = pathlib.Path(user_dir) / "default_model.txt"
+    assert not config_path.exists()
+    assert llm.get_default_model() == "gpt-4o-mini"
+    assert llm.get_model().model_id == "gpt-4o-mini"
+    llm.set_default_model("gpt-4o")
+    assert config_path.exists()
+    assert llm.get_default_model() == "gpt-4o"
+    assert llm.get_model().model_id == "gpt-4o"

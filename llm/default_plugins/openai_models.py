@@ -27,10 +27,17 @@ def register_models(register):
     register(Chat("gpt-3.5-turbo-16k"), aliases=("chatgpt-16k", "3.5-16k"))
     register(Chat("gpt-4"), aliases=("4", "gpt4"))
     register(Chat("gpt-4-32k"), aliases=("4-32k",))
-    # GPT-4 turbo models
+    # GPT-4 Turbo models
     register(Chat("gpt-4-1106-preview"))
     register(Chat("gpt-4-0125-preview"))
-    register(Chat("gpt-4-turbo-preview"), aliases=("gpt-4-turbo", "4-turbo", "4t"))
+    register(Chat("gpt-4-turbo-2024-04-09"))
+    register(Chat("gpt-4-turbo"), aliases=("gpt-4-turbo-preview", "4-turbo", "4t"))
+    # GPT-4o
+    register(Chat("gpt-4o"), aliases=("4o",))
+    register(Chat("gpt-4o-mini"), aliases=("4o-mini",))
+    # o1
+    register(Chat("o1-preview", can_stream=False, allows_system_prompt=False))
+    register(Chat("o1-mini", can_stream=False, allows_system_prompt=False))
     # The -instruct completion model
     register(
         Completion("gpt-3.5-turbo-instruct", default_max_tokens=256),
@@ -244,7 +251,6 @@ class SharedOptions(llm.Options):
 class Chat(Model):
     needs_key = "openai"
     key_env_var = "OPENAI_API_KEY"
-    can_stream: bool = True
 
     default_max_tokens = None
 
@@ -264,6 +270,8 @@ class Chat(Model):
         api_version=None,
         api_engine=None,
         headers=None,
+        can_stream=True,
+        allows_system_prompt=True,
     ):
         self.model_id = model_id
         self.key = key
@@ -273,12 +281,16 @@ class Chat(Model):
         self.api_version = api_version
         self.api_engine = api_engine
         self.headers = headers
+        self.can_stream = can_stream
+        self.allows_system_prompt = allows_system_prompt
 
     def __str__(self):
         return "OpenAI Chat: {}".format(self.model_id)
 
     def execute(self, prompt, stream, response, conversation=None):
         messages = []
+        if prompt.system and not self.allows_system_prompt:
+            raise NotImplementedError("Model does not support system prompts")
         current_system = None
         if conversation is not None:
             for prev_response in conversation.responses:
@@ -326,53 +338,55 @@ class Chat(Model):
                 stream=False,
                 **kwargs,
             )
-            response.response_json = remove_dict_none_values(completion.dict())
+            response.response_json = remove_dict_none_values(completion.model_dump())
             yield completion.choices[0].message.content
 
     def get_client(self):
         kwargs = {}
-        if self.api_type == 'azure':
-            key_env_var = "AZURE_OPENAI_API_KEY"
 
+        if self.api_type == "azure":
+            key_env_var = "AZURE_OPENAI_API_KEY"
             kwargs["api_version"] = self.api_version
             kwargs["azure_endpoint"] = self.api_base
 
             if self.needs_key:
-                if self.key:
-                    kwargs["api_key"] = self.key
-                else:
-                    kwargs["api_key"] = os.environ.get(key_env_var)
-                    if not kwargs["api_key"]:
-                        raise ValueError(
-                            f"OpenAI API key not found. Please set {key_env_var} environment variable."
-                        )
-            else:
-                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-                kwargs['azure_ad_token_provider'] = get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+                kwargs["api_key"] = os.environ.get(key_env_var)
+                if not kwargs["api_key"]:
+                    raise ValueError(
+                        f"OpenAI API key not found. Please set {key_env_var} environment variable."
+                    )
 
+            else:
+                from azure.identity import (
+                    DefaultAzureCredential,
+                    get_bearer_token_provider,
+                )
+
+                kwargs["azure_ad_token_provider"] = get_bearer_token_provider(
+                    DefaultAzureCredential(),
+                    "https://cognitiveservices.azure.com/.default",
+                )
             return openai.AzureOpenAI(**kwargs)
-        else:
-            if self.api_base:
-                kwargs["base_url"] = self.api_base
-            if self.api_type:
-                kwargs["api_type"] = self.api_type
-            if self.api_version:
-                kwargs["api_version"] = self.api_version
-            if self.api_engine:
-                kwargs["engine"] = self.api_engine
-            if self.needs_key:
-                if self.key:
-                    kwargs["api_key"] = self.key
-            else:
-                # OpenAI-compatible models don't need a key, but the
-                # openai client library requires one
-                kwargs["api_key"] = "DUMMY_KEY"
-            if self.headers:
-                kwargs["default_headers"] = self.headers
-            if os.environ.get("LLM_OPENAI_SHOW_RESPONSES"):
-                kwargs["http_client"] = logging_client()
 
-            return openai.OpenAI(**kwargs)
+        # Non-Azure configuration
+        if self.api_base:
+            kwargs["base_url"] = self.api_base
+        if self.api_type:
+            kwargs["api_type"] = self.api_type
+        if self.api_version:
+            kwargs["api_version"] = self.api_version
+        if self.api_engine:
+            kwargs["engine"] = self.api_engine
+        if self.needs_key:
+            kwargs["api_key"] = self.get_key()
+        else:
+            kwargs["api_key"] = "DUMMY_KEY"  # Required for OpenAI-compatible models
+        if self.headers:
+            kwargs["default_headers"] = self.headers
+        if os.environ.get("LLM_OPENAI_SHOW_RESPONSES"):
+            kwargs["http_client"] = logging_client()
+
+        return openai.OpenAI(**kwargs)
 
     def build_kwargs(self, prompt):
         kwargs = dict(not_nulls(prompt.options))
@@ -436,7 +450,7 @@ class Completion(Chat):
                 stream=False,
                 **kwargs,
             )
-            response.response_json = remove_dict_none_values(completion.dict())
+            response.response_json = remove_dict_none_values(completion.model_dump())
             yield completion.choices[0].text
 
 
