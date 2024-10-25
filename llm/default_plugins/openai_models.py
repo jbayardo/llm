@@ -349,13 +349,9 @@ class Chat(Model):
             kwargs["api_version"] = self.api_version
             kwargs["azure_endpoint"] = self.api_base
 
-            if self.needs_key:
-                kwargs["api_key"] = os.environ.get(key_env_var)
-                if not kwargs["api_key"]:
-                    raise ValueError(
-                        f"OpenAI API key not found. Please set {key_env_var} environment variable."
-                    )
-
+            api_key = os.environ.get(key_env_var)
+            if api_key:
+                kwargs["api_key"] = api_key
             else:
                 from azure.identity import (
                     DefaultAzureCredential,
@@ -366,6 +362,7 @@ class Chat(Model):
                     DefaultAzureCredential(),
                     "https://cognitiveservices.azure.com/.default",
                 )
+
             return openai.AzureOpenAI(**kwargs)
 
         # Non-Azure configuration
